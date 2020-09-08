@@ -1,0 +1,65 @@
+﻿@page "/"
+@using FlexGridOData.Data;
+@using C1.Blazor.Grid;
+@using C1.Blazor.DataPager;
+@using C1.DataCollection;
+@using System.IO;
+@using System.Text;
+@inject IJSRuntime JsRuntime
+@inject OrdersContext Service
+
+    <FlexGrid @ref="theGrid" ItemsSource="@(Orders)" Style="@("max-height: 70vh")" AutoGenerateColumns="false">
+        <FlexGridRows>
+            <GridFilterRow Placeholder="Enter"></GridFilterRow>
+        </FlexGridRows>
+        <FlexGridColumns>
+            <GridColumn Header="OrderID" Binding="OrderID"></GridColumn>
+            <GridColumn Header="CustomerID" Binding="CustomerID"></GridColumn>
+            <GridDateTimeColumn Header="OrderDate" Binding="OrderDate" Format="MMM dd, yyyy"></GridDateTimeColumn>
+            <GridColumn Header="ShipName" Width="300" Binding="ShipName"></GridColumn>
+            <GridColumn Header="ShipCity" Binding="ShipCity"></GridColumn>
+            <GridColumn Header="ShipRegion" Binding="ShipRegion"></GridColumn>
+            <GridColumn Header="ShipCountry" Binding="ShipCountry"></GridColumn>
+        </FlexGridColumns>
+    </FlexGrid>
+    <br />
+    <C1DataPager Source="Orders"></C1DataPager>
+    <br />
+    <button class="btn btn-primary" @onclick="SaveCSV">Export CSV</button>
+@code { 
+    C1PagedDataCollection<Order> Orders;
+    C1GroupDataCollection<Order> GroupedData;
+    FlexGrid theGrid;
+    string fileName = "ExportedGrid";
+    string fileType = "csv";
+
+    protected override async Task OnInitializedAsync()
+    {
+        Orders = new C1PagedDataCollection<Order>(await Service.GetOrders());
+        GroupedData = new C1GroupDataCollection<Order>(Orders, true);
+        await GroupedData.GroupAsync(new GroupDescription("ShipCountry"));
+    }
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        // workaround
+        //var rowCollection = theGrid.Rows;
+        //if (rowCollection.Count() > 0 && rowCollection[0].GetType() != typeof(GridFilterRow))
+        //{
+        //    var filterRow = new GridFilterRow();
+        //    filterRow.Placeholder = "Enter text to filter";
+        //    rowCollection.Insert(0, filterRow);
+        //}
+    }
+
+    async void SaveCSV()
+    {
+        var fileContent = "";
+        using(var stream = new MemoryStream())
+        {
+            theGrid.Save(stream, GridFileFormat.Csv);
+            fileContent = UTF8Encoding.UTF8.GetString(stream.GetBuffer());
+        }
+        await JsRuntime.InvokeVoidAsync("saveFile", fileContent, fileName);
+    }
+}
